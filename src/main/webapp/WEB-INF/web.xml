@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+xmlns="http://xmlns.jcp.org/xml/ns/javaee" 
+xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee 
+http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd" 
+id="WebApp_ID" version="3.1">
+<!-- 
+web.xml : tomcat서버의 설정
+웹 프로젝트의 배포 설명자/배치 기술서(deployment description)이며, 웹 프로젝트가 배포되는 데 이용되는 XML 형식의
+자바 웹 애플리케이션 환경 설정 부분을 담당함
+스프링 웹 프로젝트가 실행되면 가장 먼저 web.xml 파일을 읽어들이고 위부터 차례대로 태그를 해석함
+
+1) 네임 스페이스 : 코드에서 이름은 같지만 내용이 전혀 다른 요소와 충돌하지 않도록 요소들을 구별하는 데 사용함
+2) 스키마 : 코드의 구조와 요소, 속성의 관계를 정의하여 다양한 자료형을 사용할 수 있도록 정의된 문서 구조, 즉 틀을 의미
+ xsi:schemaLocation 속성은 참조하고자 하는 인스턴스 문서의 URI를 지정함
+ 	두 개의 속성 값은 공백으로 구분. 첫 번재는 사용할 네임 스페이스(보통 기본 네임 스페이스와 동일)이고,
+ 		두 번째는 참조할 스키마 파일 이름
+
+ -->
+
+	<!-- The definition of the Root Spring Container shared by all Servlets and Filters -->
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<param-value>/WEB-INF/spring/root-context.xml</param-value>
+	</context-param>
+	
+	<!-- Creates the Spring Container shared by all Servlets and Filters -->
+	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+	</listener>
+
+	<!-- Processes application requests -->
+	<servlet>
+		<servlet-name>appServlet</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>/WEB-INF/spring/appServlet/servlet-context.xml</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+		
+		<!-- 파일업로드 설정 시작 -->
+		<multipart-config>
+			<location>c:\\upload</location><!-- 어딘데? -->
+			<max-file-size>20971520</max-file-size><!-- 최대가 얼만데? 20MB -->
+			<max-request-size>41943040</max-request-size><!-- 한번에 최대가 얼만데? 40M -->
+			<file-size-threshold>20971520</file-size-threshold><!-- 메모리 사용 크기 : 20MB -->
+		</multipart-config>
+		<!-- 파일업로드 설정 끝 -->
+	</servlet>
+		
+	<servlet-mapping>
+		<servlet-name>appServlet</servlet-name>
+		<url-pattern>/</url-pattern>
+	</servlet-mapping>
+
+	<!-- 한글 처리.. request.setCharacterEncoding("UTF-8") 안해도 됨-->
+	<filter>
+		<filter-name>encodingFilter</filter-name>
+		<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+		<init-param>
+			<param-name>encoding</param-name>
+			<param-value>UTF-8</param-value>
+		</init-param>
+		<init-param>
+			<param-name>forceEncoding</param-name>
+			<param-value>true</param-value>
+		</init-param>
+	</filter>
+	<filter-mapping>
+		<filter-name>encodingFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+	
+	<!-- 파일업로드 설정 시작.한글 처리 다음에 넣기! -->
+	<filter>
+		<display-name>springMultipartFilter</display-name>
+		<filter-name>springMultipartFilter</filter-name>
+		<filter-class>org.springframework.web.multipart.support.MultipartFilter</filter-class>
+	</filter>
+	<filter-mapping>
+		<filter-name>springMultipartFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+	<!-- 파일업로드 설정 끝 -->
+</web-app>
+
+
+
+
+
+
+

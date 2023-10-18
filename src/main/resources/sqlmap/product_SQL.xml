@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : 매퍼xml 파일이 여러개일 수 있음
+	이를 구별하기 위한 식별 용도로 사용
+ -->
+<mapper namespace="product">
+	
+	<!-- 상품 등록
+	ProductVO [productId=P1237, pname=에어팟3, unitPrice=200000, description=<p>asdf</p>
+	, manufacturer=Apple, category=소설, unitsInStock=1000, condition=Old, filename=null
+	, productImage=org.springframework.web.multipart.support.StandardMultipartHttpServletRequest$StandardMultipartFile@8b8812f
+	, quantity=0]
+	 -->
+	<insert id="processAddProduct" parameterType="productVO">
+		<selectKey resultType="String" order="BEFORE" keyProperty="productId">
+			SELECT SUBSTR(MAX(PRODUCT_ID),1,1)
+			    || TRIM((SUBSTR(MAX(PRODUCT_ID),2) + 1))
+			FROM   PRODUCT
+		</selectKey>
+		
+		INSERT INTO PRODUCT(PRODUCT_ID, PNAME, UNIT_PRICE, DESCRIPTION, MANUFACTURER
+		, CATEGORY, UNIT_IN_STOCK, CONDITION,
+		<if test="filename!=null and filename!=''"> 
+			FILENAME, 
+		</if>
+		QUANTITY)
+		VALUES(#{productId}, #{pname}, #{unitPrice}, #{description}, #{manufacturer}
+		, #{category}, #{unitsInStock}, #{condition},
+		<if test="filename!=null and filename!=''">
+			#{filename},
+		</if> 
+		#{quantity})
+	</insert>
+	
+	<!-- 상품 목록 -->
+	<select id="products" resultType="productVO">
+		SELECT PRODUCT_ID, PNAME, UNIT_PRICE, DESCRIPTION, MANUFACTURER
+		     , CATEGORY, UNIT_IN_STOCK, CONDITION, FILENAME, QUANTITY
+		FROM   PRODUCT
+		ORDER BY PRODUCT_ID ASC
+	</select>
+	
+	<!-- 상품 상세 보기 -->
+	<select id="product" parameterType="String" resultType="productVO">
+		SELECT PRODUCT_ID, PNAME, UNIT_PRICE, DESCRIPTION, MANUFACTURER
+		     , CATEGORY, UNIT_IN_STOCK, CONDITION, FILENAME, QUANTITY
+		FROM   PRODUCT
+		WHERE  PRODUCT_ID = #{productId}
+	</select>
+	
+	
+</mapper>
+
+
+
+
+
+
+
+

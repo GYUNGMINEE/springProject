@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : 매퍼xml 파일이 여러개일 수 있음 이를 구별하기 위한 식별 용도로 사용 -->
+<mapper namespace="bookInfo">
+	<!-- map : {size=10, currentPage=1, keyword=개똥이} -->
+	<sql id="where">
+		<!-- 전체검색 -->
+		<if test="keyword!=null and keyword!=''">
+		AND   (
+                  CATEGORY    LIKE '%' || #{keyword} || '%' OR
+                  NAME        LIKE '%' || #{keyword} || '%' OR
+                  DESCRIPTION LIKE '%' || #{keyword} || '%' OR
+                  AUTHOR      LIKE '%' || #{keyword} || '%' OR
+                  PUBLISHER   LIKE '%' || #{keyword} || '%' 
+              )
+        </if>
+	</sql>
+	
+	<!-- 1-1) 도서 정보 등록 //BookInfoVO(author=개똥이, bookId=ISBN1234, category=소설, 
+		condition=신규도서 //, description=<p>내용부분</p> //, name=개똥이의 여행, publisher=삼성출판사, 
+		releaseDate=2023-07-26 //, totalPages=100, unitPrice=10000, unitsInStock=0 -->
+	<!-- insert/update/delete 태그의 경우 resultType은 생략 트랜잭션 : 데이터베이스를 변경하기위해 수행되어야 
+		할 논리적 단위. 여러개의 sql로 구성됨 -->
+	<insert id="addBookPost" parameterType="bookInfoVO">
+		INSERT INTO
+		BOOK_INFO(BOOK_ID, NAME, UNIT_PRICE, AUTHOR, DESCRIPTION, PUBLISHER
+		,
+		CATEGORY, UNITS_IN_STOCK, TOTAL_PAGES, RELEASE_DATE, CONDITION)
+		VALUES(#{bookId},#{name},#{unitPrice},#{author},#{description},#{publisher}
+		, #{category}, #{unitsInStock}, #{totalPages}, #{releaseDate},
+		#{condition})
+	</insert>
+
+	<!-- 1-2) 첨부파일 등록 -->
+	<insert id="addAttach" parameterType="attachVO">
+		<selectKey resultType="int" order="BEFORE" keyProperty="seq">
+			SELECT NVL(MAX(SEQ),0) + 1 FROM ATTACH
+		</selectKey>
+		INSERT INTO ATTACH(SEQ, BOOK_ID, FILENAME)
+		VALUES(#{seq},#{bookId},#{filename})
+	</insert>
+
+	<!-- 도서코드 자동생성 -->
+	<select id="getBookId" resultType="String">
+		SELECT
+		SUBSTR(NVL(MAX(BOOK_ID),'ISBN1234'),1,4)
+		|| TRIM((SUBSTR(NVL(MAX(BOOK_ID),'ISBN1234'),5) + 1))
+		FROM BOOK_INFO
+	</select>
+
+	<resultMap type="bookInfoVO" id="bookInfoMap">
+		<result property="rnum" column="RNUM" />
+		<result property="bookId" column="BOOK_ID" />
+		<result property="name" column="NAME" />
+		<result property="unitPrice" column="UNIT_PRICE" />
+		<result property="author" column="AUTHOR" />
+		<result property="description" column="DESCRIPTION" />
+		<result property="publisher" column="PUBLISHER" />
+		<result property="category" column="CATEGORY" />
+		<result property="unitsInStock" column="UNITS_IN_STOCK" />
+		<result property="totalPages" column="TOTAL_PAGES" />
+		<result property="releaseDate" column="RELEASE_DATE" />
+		<result property="condition" column="CONDITION" />
+		<collection property="attachVOList" resultMap="attachMap"></collection>
+	</resultMap>
+	
+	<resultMap type="attachVO" id="attachMap">
+		<result property="seq" column="SEQ" />
+		<result property="bookId" column="BOOK_ID" />
+		<result property="filename" column="FILENAME" />
+	</resultMap>
+
+	<!-- 도서 목록 관계차수 => BOOK_INFO : ATTACH = 1 : N 
+	map : {size=10, currentPage=3, keyword=}
+	map : {size=10, currentPage=1, keyword=개똥이}
+	-->
+	<select id="listBook" parameterType="hashMap" resultMap="bookInfoMap">
+		WITH U AS(
+		    SELECT ROW_NUMBER() OVER(ORDER BY T.BOOK_ID DESC) RNUM
+		         , T.*
+		    FROM
+		    (
+				<![CDATA[
+		        SELECT A.BOOK_ID, A.NAME
+		             , A.UNIT_PRICE, A.AUTHOR
+		             , SUBSTR(A.DESCRIPTION,1,7) || '..</p>' DESCRIPTION
+		             , A.PUBLISHER, A.CATEGORY, A.UNITS_IN_STOCK
+		             , A.TOTAL_PAGES, A.RELEASE_DATE, A.CONDITION
+		             , B.SEQ, B.FILENAME
+		        FROM BOOK_INFO A LEFT OUTER JOIN ATTACH B
+		        ON(A.BOOK_ID = B.BOOK_ID)
+				]]>
+		        WHERE 1 = 1
+		        <include refid="where"></include>
+		    ) T
+		)
+		SELECT U.*
+		FROM   U
+		WHERE  U.RNUM BETWEEN (#{currentPage} * #{size})-(#{size}-1) 
+						  AND (#{currentPage} * #{size})
+	</select>
+	
+	<!-- BOOK_INFO 테이블의 전체 행 수 -->
+	<select id="getBookInfoTotal" parameterType="hashMap" resultType="int">
+		SELECT COUNT(*) FROM BOOK_INFO
+		WHERE 1 = 1
+		<include refid="where"></include>
+	</select>
+	
+	<!-- 도서 상세 
+	String bookId = "ISBN1234"
+	
+	ORDER BY B.SEQ ASC : data.attachVOList[0].filename 때문에..
+	-->
+	<select id="detailBook" parameterType="String" resultMap="bookInfoMap">
+		SELECT A.BOOK_ID, A.NAME, A.UNIT_PRICE, A.AUTHOR, A.DESCRIPTION
+		     , A.PUBLISHER, A.CATEGORY, A.UNITS_IN_STOCK, A.TOTAL_PAGES, A.RELEASE_DATE, A.CONDITION
+		     , B.SEQ,B.BOOK_ID,B.FILENAME
+		FROM   BOOK_INFO A LEFT OUTER JOIN ATTACH B ON(A.BOOK_ID = B.BOOK_ID)
+		WHERE  A.BOOK_ID = #{bookId}
+		ORDER BY B.SEQ ASC
+	</select>
+	
+	<!-- 1) 도서정보 수정 
+	BookInfoVO(rnum=0, author=개똥이, bookId=ISBN1453, category=IT 모바일
+	, condition=신규도서, description=<p>내용145322</p>
+	, name=제목1452, publisher=개똥이출판사2, releaseDate=2023-07-31
+	, totalPages=1002, unitPrice=12002, unitsInStock=0, bookImage=org.springfram...)
+	-->
+	<update id="updateBookPost" parameterType="bookInfoVO">
+		UPDATE BOOK_INFO
+		SET    NAME=#{name},UNIT_PRICE=#{unitPrice},AUTHOR=#{author},
+		       PUBLISHER=#{publisher},RELEASE_DATE=#{releaseDate},
+		       UNITS_IN_STOCK=#{unitsInStock},CATEGORY=#{category},
+		       DESCRIPTION=#{description},CONDITION=#{condition},
+		       TOTAL_PAGES=#{totalPages}
+		WHERE  BOOK_ID=#{bookId}
+	</update>
+	
+	<!-- 2) BOOK_INFO테이블을 update한 후 ATTACH테이블도 update할 수 있음 
+	한 권의 책에 첨부파일이 여러개일 경우 첫번째 첨부파일만 변경
+	-->
+	<update id="updateAttach" parameterType="attachVO">
+		MERGE INTO ATTACH A
+		USING DUAL ON(A.BOOK_ID = #{bookId})
+		WHEN MATCHED THEN   
+		    UPDATE 
+		    SET    A.FILENAME = #{filename}
+		    WHERE  A.SEQ = (
+		            SELECT MIN(B.SEQ)
+		            FROM ATTACH B
+		            WHERE B.BOOK_ID = A.BOOK_ID
+		        )
+		WHEN NOT MATCHED THEN   
+		    INSERT (SEQ, BOOK_ID, FILENAME)
+		    VALUES((SELECT NVL(MAX(SEQ),0) + 1 FROM ATTACH),#{bookId},#{filename})
+	</update>
+	
+	<!-- 도서 삭제 -->
+	<delete id="deleteBookPost" parameterType="bookInfoVO">
+		DELETE FROM BOOK_INFO
+		WHERE  BOOK_ID = #{bookId}
+	</delete>
+</mapper>
+
+
+
+
+
+
+
+
